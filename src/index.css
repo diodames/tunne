@@ -1,0 +1,166 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-sans/700.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+    --font-sans: 'IBM Plex Sans', sans-serif;
+    --font-mono: 'IBM Plex Mono', monospace;
+    --font-display: var(--font-sans);
+    --font-heading: var(--font-sans);
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    /* Verdict palette — gain green / loss red / caution amber */
+    --color-under: var(--under);
+    --color-under-soft: var(--under-soft);
+    --color-fair: var(--fair);
+    --color-fair-soft: var(--fair-soft);
+    --color-over: var(--over);
+    --color-over-soft: var(--over-soft);
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+    /* Yahoo Finance-style dark theme — near-black neutrals, blue accent */
+    --background: #101216;
+    --foreground: #F0F2F5;
+    --card: #191C21;
+    --card-foreground: #F0F2F5;
+    --popover: #1E2228;
+    --popover-foreground: #F0F2F5;
+    --primary: #0F69FF;
+    --primary-foreground: #FFFFFF;
+    --secondary: #262B33;
+    --secondary-foreground: #F0F2F5;
+    --muted: #22262D;
+    --muted-foreground: #8C96A3;
+    --accent: #12305B;
+    --accent-foreground: #6EA8FF;
+    --destructive: #FF4D52;
+    --border: #2A2F37;
+    --input: #333944;
+    --ring: #0F69FF;
+    --chart-1: #00C073;
+    --chart-2: #E8A93C;
+    --chart-3: #FF4D52;
+    --chart-4: #8C96A3;
+    --chart-5: #6EA8FF;
+    --radius: 0.625rem;
+    --sidebar: #191C21;
+    --sidebar-foreground: #F0F2F5;
+    --sidebar-primary: #0F69FF;
+    --sidebar-primary-foreground: #FFFFFF;
+    --sidebar-accent: #12305B;
+    --sidebar-accent-foreground: #6EA8FF;
+    --sidebar-border: #2A2F37;
+    --sidebar-ring: #0F69FF;
+    --under: #00C073;
+    --under-soft: #0C2B1F;
+    --fair: #E8A93C;
+    --fair-soft: #2E230D;
+    --over: #FF4D52;
+    --over-soft: #331416;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    }
+  body {
+    @apply bg-background text-foreground antialiased;
+    }
+  html {
+    @apply font-sans;
+    color-scheme: dark;
+    }
+  h1, h2, h3 {
+    text-wrap: balance;
+    }
+  p {
+    text-wrap: pretty;
+    }
+}
+
+@utility font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+/* Ink-stamp verdict mark — the Ledger's signature */
+@utility stamp {
+  display: inline-block;
+  rotate: -4deg;
+  border: 1.5px solid currentColor;
+  border-radius: 4px;
+  padding: 0.5px 7px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+}
+
+@keyframes vl-rise {
+  from { opacity: 0; translate: 0 10px; filter: blur(4px); }
+  to { opacity: 1; translate: 0 0; filter: blur(0px); }
+}
+
+@utility rise {
+  animation: vl-rise 0.45s cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+/* Collapsible expand/collapse — exit faster and subtler than enter */
+@keyframes vl-collapse-open {
+  from { height: 0; opacity: 0; }
+  to { height: var(--radix-collapsible-content-height); opacity: 1; }
+}
+
+@keyframes vl-collapse-close {
+  from { height: var(--radix-collapsible-content-height); opacity: 1; }
+  to { height: 0; opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
