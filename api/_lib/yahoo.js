@@ -17,6 +17,68 @@ function humanizeMarketCap(n) {
 
 const num = (v) => (typeof v === "number" && isFinite(v) ? v : null);
 
+function medianPositive(values) {
+  const sorted = values.filter((v) => num(v) !== null && v > 0).sort((a, b) => a - b);
+  if (!sorted.length) return null;
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+async function computeIndustryMedians(ticker) {
+  const { peers } = await resolveIndustryPeers(ticker, 8);
+  if (!peers.length) {
+    return { industry_avg_pe: null, industry_median_pb: null, industry_median_ev_ebitda: null };
+  }
+
+  const [quotes, summaries] = await Promise.all([
+    yahooFinance.quote(peers).catch(() => []),
+    Promise.all(
+      peers.slice(0, 6).map((sym) =>
+        yahooFinance
+          .quoteSummary(sym, { modules: ["defaultKeyStatistics", "financialData"] })
+          .catch(() => null)
+      )
+    ),
+  ]);
+
+  const quoteList = Array.isArray(quotes) ? quotes : [quotes];
+  const pes = [];
+  const pbs = [];
+  const evRatios = [];
+
+  for (const q of quoteList) {
+    if (num(q?.trailingPE) > 0) pes.push(q.trailingPE);
+    if (num(q?.priceToBook) > 0) pbs.push(q.priceToBook);
+  }
+
+  for (const s of summaries) {
+    const ev = num(s?.defaultKeyStatistics?.enterpriseValue);
+    const ebitda = num(s?.financialData?.ebitda);
+    if (ev && ebitda && ebitda !== 0) evRatios.push(ev / ebitda);
+  }
+
+  return {
+    industry_avg_pe: medianPositive(pes),
+    industry_median_pb: medianPositive(pbs),
+    industry_median_ev_ebitda: medianPositive(evRatios),
+  };
+}
+
+async function fetchPricePercentile5y(ticker, price) {
+  if (!num(price)) return null;
+  try {
+    const chart = await fetchYahooChart(ticker, "5y");
+    const prices = (chart.points || []).map((p) => num(p.p)).filter((p) => p !== null);
+    if (prices.length < 20) return null;
+    const low = Math.min(...prices);
+    const high = Math.max(...prices);
+    if (high <= low) return null;
+    return Math.min(1, Math.max(0, (price - low) / (high - low)));
+  } catch {
+    return null;
+  }
+}
+
 /* ————— quality scores from annual fundamentals ————— */
 
 function computePiotroski(cur, prev) {
@@ -98,13 +160,24 @@ async function fetchQualityScores(ticker, marketCap) {
 }
 
 export async function fetchYahooMetrics(ticker) {
-  const [q, s] = await Promise.all([
+  const [q, s, industryMedians] = await Promise.all([
     yahooFinance.quote(ticker),
     yahooFinance
       .quoteSummary(ticker, {
-        modules: ["assetProfile", "defaultKeyStatistics", "financialData"],
+        modules: [
+          "assetProfile",
+          "defaultKeyStatistics",
+          "financialData",
+          "calendarEvents",
+          "summaryDetail",
+        ],
       })
       .catch(() => ({})),
+    computeIndustryMedians(ticker).catch(() => ({
+      industry_avg_pe: null,
+      industry_median_pb: null,
+      industry_median_ev_ebitda: null,
+    })),
   ]);
   if (!q || num(q.regularMarketPrice) === null) {
     throw new Error(`No quote data found for "${ticker}"`);
@@ -112,19 +185,32 @@ export async function fetchYahooMetrics(ticker) {
 
   const stats = s.defaultKeyStatistics || {};
   const fin = s.financialData || {};
+  const detail = s.summaryDetail || {};
   const mcap = num(q.marketCap);
+  const price = num(q.regularMarketPrice);
   const fcf = num(fin.freeCashflow);
   const ev = num(stats.enterpriseValue);
   const ebitda = num(fin.ebitda);
-  const quality = await fetchQualityScores(ticker, mcap).catch(() => ({
-    piotroski: null,
-    altman_z: null,
-  }));
+
+  const [quality, pricePercentile5y] = await Promise.all([
+    fetchQualityScores(ticker, mcap).catch(() => ({
+      piotroski: null,
+      altman_z: null,
+    })),
+    fetchPricePercentile5y(ticker, price),
+  ]);
+
+  const earningsDates = s.calendarEvents?.earnings?.earningsDate;
+  const nextEarnings = Array.isArray(earningsDates)
+    ? earningsDates.map((d) => new Date(d)).filter((d) => d >= new Date()).sort((a, b) => a - b)[0]
+    : earningsDates
+      ? new Date(earningsDates)
+      : null;
 
   return {
     company_name: q.longName || q.shortName || ticker,
     currency: q.currency || null,
-    price: num(q.regularMarketPrice),
+    price,
     day_change_pct: num(q.regularMarketChangePercent),
     market_cap: humanizeMarketCap(mcap),
     sector: s.assetProfile?.sector || null,
@@ -133,13 +219,30 @@ export async function fetchYahooMetrics(ticker) {
     bvps: num(q.bookValue),
     pe_ttm: num(q.trailingPE),
     pe_forward: num(q.forwardPE),
-    industry_avg_pe: null,
+    industry_avg_pe: industryMedians.industry_avg_pe,
+    industry_median_pb: industryMedians.industry_median_pb,
+    industry_median_ev_ebitda: industryMedians.industry_median_ev_ebitda,
     pb: num(q.priceToBook),
     peg: num(stats.pegRatio),
     p_fcf: mcap && fcf && fcf !== 0 ? mcap / fcf : null,
     ev_ebitda: ev && ebitda && ebitda !== 0 ? ev / ebitda : null,
     dividend_yield_pct: num(q.dividendYield),
+    payout_ratio_pct: num(detail.payoutRatio) != null ? num(detail.payoutRatio) * 100 : num(fin.payoutRatio) != null ? num(fin.payoutRatio) * 100 : null,
     analyst_target: num(fin.targetMeanPrice),
+    analyst_target_high: num(fin.targetHighPrice),
+    analyst_target_low: num(fin.targetLowPrice),
+    analyst_count: num(fin.numberOfAnalystOpinions),
+    revenue_growth_pct: num(fin.revenueGrowth) != null ? num(fin.revenueGrowth) * 100 : null,
+    earnings_growth_pct: num(fin.earningsGrowth) != null ? num(fin.earningsGrowth) * 100 : null,
+    gross_margin_pct: num(fin.grossMargins) != null ? num(fin.grossMargins) * 100 : null,
+    operating_margin_pct: num(fin.operatingMargins) != null ? num(fin.operatingMargins) * 100 : null,
+    roe_pct: num(fin.returnOnEquity) != null ? num(fin.returnOnEquity) * 100 : null,
+    debt_to_equity: num(fin.debtToEquity),
+    short_interest_pct: num(stats.shortPercentOfFloat) != null ? num(stats.shortPercentOfFloat) * 100 : null,
+    price_percentile_5y: pricePercentile5y,
+    earnings_date: nextEarnings && !Number.isNaN(nextEarnings.getTime())
+      ? nextEarnings.toISOString().slice(0, 10)
+      : null,
     week52_low: num(q.fiftyTwoWeekLow),
     week52_high: num(q.fiftyTwoWeekHigh),
     piotroski: quality.piotroski,
@@ -240,7 +343,7 @@ async function resolveIndustryPeers(ticker, limit = 3) {
   const industryKey = targetProfile?.assetProfile?.industryKey;
   const sectorKey = targetProfile?.assetProfile?.sectorKey;
   const industryName = targetProfile?.assetProfile?.industry;
-  if (!industryKey) return { peers: [], industry: industryName || null };
+  if (!industryKey) return { peers: [], industry: industryName || null, peerDetails: [] };
 
   const profileCache = new Map();
   const getProfile = async (sym) => {
@@ -342,11 +445,15 @@ async function resolveIndustryPeers(ticker, limit = 3) {
   return {
     industry: industryName || null,
     peers: matched.slice(0, limit).map((m) => m.symbol),
+    peerDetails: matched.slice(0, limit).map((m) => ({
+      symbol: m.symbol,
+      market_cap: humanizeMarketCap(m.marketCap),
+    })),
   };
 }
 
 export async function fetchPeerCompare(ticker, range) {
-  const { peers: peerSymbols, industry } = await resolveIndustryPeers(ticker, 3);
+  const { peers: peerSymbols, industry, peerDetails } = await resolveIndustryPeers(ticker, 3);
 
   const seriesMeta = [
     { id: ticker.toUpperCase(), role: "primary", label: ticker.toUpperCase() },
@@ -394,6 +501,7 @@ export async function fetchPeerCompare(ticker, range) {
     range,
     industry,
     peers: peerSymbols,
+    peer_details: peerDetails || [],
     series: chartResults.map(({ id, role, label, error }) => ({ id, role, label, error })),
     points,
   };
@@ -794,10 +902,10 @@ ${fmtGroup("Stock outlook signals", outlook.ticker)}
 ${fmtGroup("Industry/sector outlook signals", outlook.industry)}
 
 Respond with ONLY a JSON object (no markdown fences) with two keys:
-- "ticker": 2 sentences on the likely near-term direction for ${ticker} based on these signals. Mention the strongest bullish and bearish inputs.
-- "industry": 2 sentences on the near-term outlook for the ${metrics.sector || "broader"} sector/industry based on these signals.
+- "ticker": ONE short sentence (max ~22 words) on the likely near-term direction for ${ticker}. Wrap the overall lean, the top bullish input, and top bearish input in **double-asterisk markdown bold** (e.g. "**Modestly bullish** — **Altman Z 17.7** vs. **EV/EBITDA 131×**").
+- "industry": ONE short sentence (max ~22 words) on the near-term outlook for the ${metrics.sector || "broader"} sector/industry. Bold the sector lean and the 1–2 strongest signal numbers or labels.
 
-Be balanced, cite specific signals, and do NOT give buy/sell advice or use "you should". Plain text inside each JSON value only.`;
+Be balanced and cite only signals listed above. Bold key numbers, metric names, and lean labels with **markdown**. No buy/sell advice or "you should". Plain text with **bold** markers inside each JSON value only.`;
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -808,7 +916,7 @@ Be balanced, cite specific signals, and do NOT give buy/sell advice or use "you 
     },
     body: JSON.stringify({
       model: "claude-sonnet-4-6",
-      max_tokens: 350,
+      max_tokens: 180,
       messages: [{ role: "user", content: prompt }],
     }),
   });
