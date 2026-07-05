@@ -1,8 +1,8 @@
 # Tausta
 
-**Tausta** (*background* in Finnish) is a ticker context tool that adds context around a symbol — not just a price, but how it scores on classic value rules, where it sits in its range, how peers compare, and what the street is saying.
+**Tausta** (*background* in Finnish) — valuation, range, peers, and street pulse from live Yahoo Finance data.
 
-Search up to three symbols, pick the valuation strategies you care about, and get a tagged verdict per method from live Yahoo Finance figures.
+Search up to three symbols, choose **strategy presets** or toggle individual methods, and get a tagged verdict per strategy.
 
 ## What it does
 
@@ -20,7 +20,16 @@ Enter a ticker (or company name — e.g. `AAPL`, `Tesla`, `PETR4.SA`) and Tausta
 - **Street pulse** — recent headlines and (with an API key) an AI TL;DR; StockTwits demoted to optional retail mood
 - **Tausta's read** — (with an API key) a short AI summary of price context, strategy read, and key caveats
 
-Compare up to **three tickers** side by side. Starter packs (value, growth, dividends, banks, etc.), **strategy personas**, watchlist, shareable URLs, and recent searches make it easy to explore.
+### Getting started
+
+On first visit, a sample **BRK.B** report loads automatically. The home screen offers **starter packs** (value vs growth, megacap trio, dividend income, banks, global ADRs, and more) — each applies a matching strategy preset and runs the tickers.
+
+Below the search bar:
+
+- **Recent** and **Saved** chips when you have history or a watchlist
+- **Popular** quick picks (`AAPL`, `MSFT`, `KO`, `INTC`) when you have neither
+
+Share an analysis via the **Share** button (copies a URL with tickers and strategies). Press **`/`** to focus the search box. Click **Tausta** in the header to return home.
 
 ### Strategies
 
@@ -31,9 +40,17 @@ Compare up to **three tickers** side by side. Starter packs (value, growth, divi
 | Price context | 52-week range position (context only — excluded from composite) |
 | Quality & risk | Piotroski F-Score, Altman Z-Score |
 
-Toggle strategies on or off before running an analysis, or pick a **persona** preset (Balanced, Deep value, Quality, Dividend). Your selection is remembered in the browser.
+Open the strategies menu (sliders icon with a count badge) to pick a **preset** or toggle methods individually:
 
-Share an analysis via the **Share** button (copies a URL with tickers and strategies). Press **`/`** to focus the search box.
+| Preset | What it selects |
+| --- | --- |
+| All methodologies | All 12 strategies |
+| Balanced (default) | All except Graham Number |
+| Deep value | Value ratios, Graham, quality scores, 52-week range |
+| Quality at reasonable price | Earnings multiples, cash flow, analyst gap, quality scores |
+| Dividend sustainability | Yield, cash flow, P/E, quality scores |
+
+Your selection is remembered in the browser. Use **clear** in the preset header to deselect everything.
 
 ## Run locally
 
@@ -100,4 +117,6 @@ The repo includes a `vercel.json` for [Vercel](https://vercel.com/) deploys. Set
 
 ## Disclaimer
 
-Figures are pulled live from Yahoo Finance and may be delayed or approximate. Strategy tags are rule-of-thumb screens, not proof of intrinsic value. **Educational tool only — not financial advice.** Verify anything important with primary sources or a licensed adviser.
+Live Yahoo financial data — educational tool — not financial advice. Figures may be delayed or approximate. Strategy tags are rule-of-thumb screens, not proof of intrinsic value. Verify anything important with primary sources or a licensed adviser.
+
+Built by [Martin Andrle](https://martinandrle.com).

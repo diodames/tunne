@@ -322,6 +322,10 @@ const MAX_WATCHLIST = 20;
 const DEFAULT_STRATEGY_IDS = STRATEGIES.filter((s) => s.id !== "graham").map((s) => s.id);
 
 const STRATEGY_PERSONAS = {
+  all: {
+    label: "All methodologies",
+    ids: STRATEGIES.map((s) => s.id),
+  },
   balanced: {
     label: "Balanced (default)",
     ids: DEFAULT_STRATEGY_IDS,
@@ -406,6 +410,17 @@ const STARTER_PRESETS = [
     persona: "balanced",
   },
 ];
+
+const STARTER_ICON_HOVER = {
+  demo: "group-hover:-translate-y-0.5 group-hover:-rotate-6",
+  contrast: "group-hover:scale-110",
+  megacap: "group-hover:scale-105 group-hover:-translate-y-px",
+  trap: "group-hover:rotate-12",
+  dividend: "group-hover:-translate-y-0.5 group-hover:scale-105",
+  growth: "group-hover:scale-105 group-hover:-translate-y-px",
+  banks: "group-hover:scale-110",
+  global: "group-hover:rotate-45",
+};
 
 const QUICK_TICKERS = ["AAPL", "MSFT", "KO", "INTC"];
 
@@ -715,12 +730,12 @@ function compositeScoreSummary(composite, results) {
 }
 
 const KIND_META = {
-  under:   { label: "Undervalued", text: "text-under", border: "border-under" },
-  fair:    { label: "Fair",        text: "text-fair",  border: "border-fair" },
-  over:    { label: "Overvalued",  text: "text-over",  border: "border-over" },
-  caution: { label: "Caution",     text: "text-over",  border: "border-over" },
-  context: { label: "Extended",    text: "text-muted-foreground", border: "border-border" },
-  na:      { label: "No data",     text: "text-muted-foreground", border: "border-border" },
+  under:   { label: "Undervalued", text: "text-under", dot: "bg-under" },
+  fair:    { label: "Fair",        text: "text-fair",  dot: "bg-fair" },
+  over:    { label: "Overvalued",  text: "text-over",  dot: "bg-over" },
+  caution: { label: "Caution",     text: "text-over",  dot: "bg-over" },
+  context: { label: "Extended",    text: "text-muted-foreground", dot: "bg-muted-foreground/40" },
+  na:      { label: "No data",     text: "text-muted-foreground", dot: "bg-muted-foreground/40" },
 };
 
 function summarizeGroupVerdicts(rows) {
@@ -1714,7 +1729,7 @@ function OutlookSection({ title, group, narrative }) {
       <ul className="m-0 mt-2 flex list-none flex-col gap-1 p-0">
         {group.signals.map((s) => (
           <li key={s.id} className="flex items-baseline gap-2 text-[11px] leading-snug">
-            <span className={cn("mt-1 size-2 shrink-0 rounded-full", SIGNAL_LEAN_DOT[s.lean])} aria-hidden />
+            <span className={cn("mt-1 size-1 shrink-0 rounded-full", SIGNAL_LEAN_DOT[s.lean])} aria-hidden />
             <span>
               <span className="font-medium text-foreground/90">{s.label}</span>
               <span className="text-muted-foreground"> · {s.detail}</span>
@@ -2446,7 +2461,7 @@ function StrategyRow({ strat, result }) {
     <Collapsible
       open={open}
       onOpenChange={setOpen}
-      className="rounded-lg px-2 py-2.5 transition-colors hover:bg-muted/30"
+      className="rounded-lg py-2.5 transition-colors hover:bg-muted/30"
     >
       <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-start gap-x-2 gap-y-1">
         <span className="text-sm font-medium leading-snug">{strat.name}</span>
@@ -2463,16 +2478,22 @@ function StrategyRow({ strat, result }) {
         </CollapsibleTrigger>
       </div>
       {!isNa && (
-        <>
-          <p className="mt-1 mb-0 font-mono text-[13px] tabular-nums leading-snug">{primary}</p>
+        <p className="mt-1 mb-0 text-[13px] leading-snug text-pretty">
+          <span className="font-mono tabular-nums">{primary}</span>
           {secondary && (
-            <p className="mt-0.5 mb-0 text-[13px] leading-snug text-muted-foreground text-pretty">{secondary}</p>
+            <>
+              <span className="text-muted-foreground"> · </span>
+              <span className="text-muted-foreground">{secondary}</span>
+            </>
           )}
-        </>
+        </p>
       )}
       <CollapsibleContent className="overflow-hidden data-[state=open]:animate-[vl-collapse-open_200ms_cubic-bezier(0.2,0,0,1)] data-[state=closed]:animate-[vl-collapse-close_150ms_cubic-bezier(0.2,0,0,1)]">
-        <div className={cn("mt-2 border-l-2 pl-3 text-[13px] leading-relaxed text-muted-foreground", m.border)}>
-          <p className="m-0">{strat.how}</p>
+        <div className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
+          <p className="m-0 flex items-start gap-2">
+            <span className={cn("mt-1 size-2 shrink-0 rounded-full", m.dot)} aria-hidden />
+            <span>{strat.how}</span>
+          </p>
           <p className="m-0 mt-1.5"><strong className="font-semibold text-under">Pro:</strong> {strat.pros}</p>
           <p className="m-0 mt-1"><strong className="font-semibold text-over">Con:</strong> {strat.cons}</p>
         </div>
@@ -2492,10 +2513,10 @@ function CompactStrategyRow({ strat, result }) {
     <Collapsible
       open={open}
       onOpenChange={setOpen}
-      className="rounded-lg px-1.5 py-1.5 transition-colors hover:bg-muted/30"
+      className="rounded-lg py-1.5 transition-colors hover:bg-muted/30"
     >
       <div className={cn(
-        "grid items-baseline gap-x-2",
+        "grid items-center gap-x-2",
         isNa ? "grid-cols-[minmax(0,1fr)_auto]" : "grid-cols-[minmax(0,1fr)_auto_auto]",
       )}>
         <span className="min-w-0 truncate text-sm leading-snug">
@@ -2524,8 +2545,11 @@ function CompactStrategyRow({ strat, result }) {
         </CollapsibleTrigger>
       </div>
       <CollapsibleContent className="overflow-hidden data-[state=open]:animate-[vl-collapse-open_200ms_cubic-bezier(0.2,0,0,1)] data-[state=closed]:animate-[vl-collapse-close_150ms_cubic-bezier(0.2,0,0,1)]">
-        <div className={cn("mt-2 border-l-2 pl-3 text-[13px] leading-relaxed text-muted-foreground", m.border)}>
-          <p className="m-0">{strat.how}</p>
+        <div className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
+          <p className="m-0 flex items-start gap-2">
+            <span className={cn("mt-1 size-2 shrink-0 rounded-full", m.dot)} aria-hidden />
+            <span>{strat.how}</span>
+          </p>
           <p className="m-0 mt-1.5"><strong className="font-semibold text-under">Pro:</strong> {strat.pros}</p>
           <p className="m-0 mt-1"><strong className="font-semibold text-over">Con:</strong> {strat.cons}</p>
         </div>
@@ -2635,6 +2659,58 @@ function TickerReport({ report, selected, index, className, onWatchlist, inWatch
 }
 
 /* ————— main app ————— */
+function QuickAccessChip({ label, running, onClick, onRemove, removeLabel }) {
+  return (
+    <span className="group/chip relative inline-flex h-7 shrink-0">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={running}
+        onClick={onClick}
+        className="h-7 max-w-[8rem] overflow-hidden rounded-full bg-card px-2.5 font-mono text-xs tabular-nums active:scale-[0.96]"
+      >
+        <span className="block min-w-0 truncate">{label}</span>
+      </Button>
+      {onRemove && (
+        <button
+          type="button"
+          aria-label={removeLabel}
+          disabled={running}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          className="absolute top-1/2 right-1 z-10 hidden size-4 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground group-hover/chip:inline-flex disabled:pointer-events-none disabled:opacity-50"
+        >
+          <XIcon className="size-3" />
+        </button>
+      )}
+    </span>
+  );
+}
+
+function PopularTickers({ running, onAnalyze, className }) {
+  return (
+    <div className={cn("flex flex-wrap items-center gap-x-2 gap-y-1.5", className)}>
+      <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Popular</span>
+      {QUICK_TICKERS.map((ticker) => (
+        <Button
+          key={ticker}
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={running}
+          onClick={() => onAnalyze([ticker])}
+          className="h-7 rounded-full bg-card px-2.5 font-mono text-xs tabular-nums active:scale-[0.96]"
+        >
+          {ticker}
+        </Button>
+      ))}
+    </div>
+  );
+}
+
 function QuickAccessChips({ recentSearches, watchlist, running, onAnalyze, onRemoveRecentSearch, onRemoveWatchlist, className }) {
   if (recentSearches.length === 0 && watchlist.length === 0) return null;
   return (
@@ -2643,29 +2719,14 @@ function QuickAccessChips({ recentSearches, watchlist, running, onAnalyze, onRem
         <>
           <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Recent</span>
           {recentSearches.slice(0, MAX_RECENT_SEARCHES).map((tickers) => (
-            <span key={tickers.join(",")} className="group/chip relative inline-flex">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={running}
-                onClick={() => onAnalyze(tickers)}
-                className="h-7 rounded-full bg-card pr-2.5 pl-2.5 font-mono text-xs tabular-nums active:scale-[0.96] group-hover/chip:pr-6"
-              >
-                {tickers.join(", ")}
-              </Button>
-              {onRemoveRecentSearch && (
-                <button
-                  type="button"
-                  aria-label={`Remove ${tickers.join(", ")} from recent`}
-                  disabled={running}
-                  onClick={() => onRemoveRecentSearch(tickers)}
-                  className="absolute top-1/2 right-1 hidden size-4 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground group-hover/chip:inline-flex disabled:pointer-events-none disabled:opacity-50"
-                >
-                  <XIcon className="size-3" />
-                </button>
-              )}
-            </span>
+            <QuickAccessChip
+              key={tickers.join(",")}
+              label={tickers.join(", ")}
+              running={running}
+              onClick={() => onAnalyze(tickers)}
+              onRemove={onRemoveRecentSearch ? () => onRemoveRecentSearch(tickers) : null}
+              removeLabel={`Remove ${tickers.join(", ")} from recent`}
+            />
           ))}
         </>
       )}
@@ -2676,29 +2737,14 @@ function QuickAccessChips({ recentSearches, watchlist, running, onAnalyze, onRem
           )}
           <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Saved</span>
           {watchlist.slice(0, 6).map((ticker) => (
-            <span key={ticker} className="group/chip relative inline-flex">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={running}
-                onClick={() => onAnalyze([ticker])}
-                className="h-7 rounded-full bg-card pr-2.5 pl-2.5 font-mono text-xs tabular-nums active:scale-[0.96] group-hover/chip:pr-6"
-              >
-                {ticker}
-              </Button>
-              {onRemoveWatchlist && (
-                <button
-                  type="button"
-                  aria-label={`Remove ${ticker} from saved`}
-                  disabled={running}
-                  onClick={() => onRemoveWatchlist(ticker)}
-                  className="absolute top-1/2 right-1 hidden size-4 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground group-hover/chip:inline-flex disabled:pointer-events-none disabled:opacity-50"
-                >
-                  <XIcon className="size-3" />
-                </button>
-              )}
-            </span>
+            <QuickAccessChip
+              key={ticker}
+              label={ticker}
+              running={running}
+              onClick={() => onAnalyze([ticker])}
+              onRemove={onRemoveWatchlist ? () => onRemoveWatchlist(ticker) : null}
+              removeLabel={`Remove ${ticker} from saved`}
+            />
           ))}
         </>
       )}
@@ -2909,12 +2955,12 @@ function TickerSearchInput({ value, onChange, onSubmit, running }) {
   );
 }
 
-function StarterPanel({ running, recentSearches, watchlist, onAnalyze, onApplyPersona, onRemoveRecentSearch, onRemoveWatchlist }) {
+function StarterPanel({ running, onAnalyze, onApplyPersona }) {
   return (
     <div className="rise mt-8" style={{ animationDelay: "300ms" }}>
       <SectionLabel className="mb-3">Get started</SectionLabel>
 
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {STARTER_PRESETS.map((preset) => {
           const Icon = preset.icon;
           return (
@@ -2927,13 +2973,20 @@ function StarterPanel({ running, recentSearches, watchlist, onAnalyze, onApplyPe
               onAnalyze(preset.tickers);
             }}
             className={cn(
-              "group flex min-w-0 flex-col items-start gap-1 rounded-xl bg-card px-3.5 py-2.5 text-left",
+              "group flex min-w-0 flex-col items-start gap-1 rounded-[12px] bg-card px-3.5 py-2.5 text-left",
               "ring-1 ring-foreground/10 transition-[box-shadow,ring-color] hover:ring-foreground/20",
               "active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50",
             )}
           >
-            <span className="flex size-7 items-center justify-center rounded-lg bg-muted/50 ring-1 ring-foreground/10 transition-colors group-hover:bg-muted/80">
-              <Icon className="size-3.5 text-muted-foreground" aria-hidden />
+            <span className="flex size-7 items-center justify-center overflow-visible rounded-lg bg-muted/50 ring-1 ring-foreground/10 transition-colors group-hover:bg-muted/80">
+              <Icon
+                className={cn(
+                  "size-3.5 text-muted-foreground",
+                  "transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)]",
+                  STARTER_ICON_HOVER[preset.id],
+                )}
+                aria-hidden
+              />
             </span>
             <span className="text-sm font-medium">{preset.label}</span>
             <span className="font-mono text-xs tabular-nums text-muted-foreground">
@@ -2944,43 +2997,11 @@ function StarterPanel({ running, recentSearches, watchlist, onAnalyze, onApplyPe
           );
         })}
       </div>
-
-      <QuickAccessChips
-        recentSearches={recentSearches}
-        watchlist={watchlist}
-        running={running}
-        onAnalyze={onAnalyze}
-        onRemoveRecentSearch={onRemoveRecentSearch}
-        onRemoveWatchlist={onRemoveWatchlist}
-        className="mt-4"
-      />
-
-      {recentSearches.length === 0 && watchlist.length === 0 && (
-        <div className="mt-4">
-          <SectionLabel className="mb-1.5">Popular</SectionLabel>
-          <div className="flex flex-wrap gap-1.5">
-            {QUICK_TICKERS.map((ticker) => (
-              <Button
-                key={ticker}
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={running}
-                onClick={() => onAnalyze([ticker])}
-                className="h-7 rounded-full bg-card px-2.5 font-mono text-xs tabular-nums active:scale-[0.96]"
-              >
-                {ticker}
-              </Button>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
-function StrategyPicker({ selected, onToggle, onSelectAll, onClear, onApplyPersona }) {
-  const allSelected = selected.size === STRATEGIES.length;
+function StrategyPicker({ selected, onToggle, onClear, onApplyPersona }) {
   const activePersona = detectActivePersona(selected);
   const personaLabel = activePersona?.label.replace(" (default)", "") ?? null;
 
@@ -2989,59 +3010,39 @@ function StrategyPicker({ selected, onToggle, onSelectAll, onClear, onApplyPerso
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          size={allSelected && !personaLabel ? "icon-sm" : "sm"}
-          className={cn("relative ml-auto shrink-0 text-muted-foreground", (!allSelected || personaLabel) && "gap-1")}
-          aria-label={`Strategies — ${selected.size} of ${STRATEGIES.length} selected${personaLabel ? `, ${personaLabel} persona` : ""}`}
+          size="icon-sm"
+          className="relative ml-auto shrink-0 text-muted-foreground"
+          aria-label={`Strategies — ${selected.size} of ${STRATEGIES.length} selected${personaLabel ? `, ${personaLabel} preset` : ""}`}
         >
-          {allSelected && !personaLabel ? (
-            <>
-              <SlidersHorizontalIcon />
-              <Badge variant="secondary" className="absolute -top-1 -right-1 h-4 min-w-4 px-1 font-mono text-[10px] tabular-nums">
-                {STRATEGIES.length}
-              </Badge>
-            </>
-          ) : (
-            <>
-              <ChevronDownIcon data-icon="inline-start" />
-              {personaLabel ?? "Strategies"}
-              <Badge variant="secondary" className="font-mono tabular-nums">
-                {selected.size}/{STRATEGIES.length}
-              </Badge>
-            </>
-          )}
+          <SlidersHorizontalIcon />
+          <Badge variant="secondary" className="absolute -top-1 -right-1 h-4 min-w-4 px-1 font-mono text-[10px] tabular-nums">
+            {selected.size}
+          </Badge>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-72">
-        <DropdownMenuLabel>Personas</DropdownMenuLabel>
-        {Object.entries(STRATEGY_PERSONAS).map(([key, persona]) => (
-          <DropdownMenuItem
-            key={key}
-            onSelect={() => onApplyPersona?.(key)}
-          >
-            {persona.label}
-          </DropdownMenuItem>
-        ))}
-        <DropdownMenuSeparator />
-        <div className="flex items-baseline gap-3 px-1.5 py-1">
+        <div className="flex items-center justify-between gap-2 px-2 py-1.5">
+          <DropdownMenuLabel className="mb-0 p-0">Presets</DropdownMenuLabel>
           <Button
             type="button"
             variant="link"
             size="xs"
-            className="relative px-0 after:absolute after:-inset-x-1 after:-inset-y-2"
-            onClick={onSelectAll}
-          >
-            select all
-          </Button>
-          <Button
-            type="button"
-            variant="link"
-            size="xs"
-            className="relative px-0 text-muted-foreground after:absolute after:-inset-x-1 after:-inset-y-2"
+            className="relative h-auto px-0 py-0 text-muted-foreground after:absolute after:-inset-x-1 after:-inset-y-2"
             onClick={onClear}
           >
             clear
           </Button>
         </div>
+        {Object.entries(STRATEGY_PERSONAS).map(([key, persona]) => (
+          <DropdownMenuCheckboxItem
+            key={key}
+            checked={activePersona?.key === key}
+            onCheckedChange={() => onApplyPersona?.(key)}
+            onSelect={(e) => e.preventDefault()}
+          >
+            {persona.label.replace(" (default)", "")}
+          </DropdownMenuCheckboxItem>
+        ))}
         <DropdownMenuSeparator />
         {GROUPS.map((g, i) => (
           <DropdownMenuGroup key={g}>
@@ -3223,8 +3224,8 @@ export default function Tausta() {
                 Tausta
               </button>
             </h1>
-            <p className="m-0 max-w-none text-sm leading-relaxed text-muted-foreground sm:max-w-xl sm:text-pretty">
-              Compare up to 3 tickers · pick valuation strategies · get tagged verdicts from live figures.
+            <p className="m-0 text-sm leading-relaxed whitespace-nowrap text-muted-foreground">
+              Ticker background — valuation, range, peers, and street pulse from live data.
             </p>
           </header>
 
@@ -3248,7 +3249,6 @@ export default function Tausta() {
               <StrategyPicker
                 selected={selected}
                 onToggle={toggleStrategy}
-                onSelectAll={() => setSelected(new Set(STRATEGIES.map((s) => s.id)))}
                 onClear={() => setSelected(new Set())}
                 onApplyPersona={applyPersona}
               />
@@ -3256,7 +3256,7 @@ export default function Tausta() {
             {selected.size === 0 && (
               <p className="m-0 mt-1.5 text-[11px] text-over">Select at least one strategy to run an analysis.</p>
             )}
-            {(recentSearches.length > 0 || watchlist.length > 0) && (
+            {(recentSearches.length > 0 || watchlist.length > 0) ? (
               <QuickAccessChips
                 recentSearches={recentSearches}
                 watchlist={watchlist}
@@ -3266,6 +3266,8 @@ export default function Tausta() {
                 onRemoveWatchlist={handleRemoveWatchlist}
                 className="mt-2"
               />
+            ) : (
+              <PopularTickers running={running} onAnalyze={analyzeTickers} className="mt-2" />
             )}
           </div>
         </div>
@@ -3274,12 +3276,8 @@ export default function Tausta() {
         {reports.length === 0 && !running && (
           <StarterPanel
             running={running}
-            recentSearches={recentSearches}
-            watchlist={watchlist}
             onAnalyze={analyzeTickers}
             onApplyPersona={applyPersona}
-            onRemoveRecentSearch={handleRemoveRecentSearch}
-            onRemoveWatchlist={handleRemoveWatchlist}
           />
         )}
         {reports.length > 1 && (
@@ -3314,9 +3312,7 @@ export default function Tausta() {
         <Separator className="mt-8" />
         <footer className="pt-4 text-[11px] leading-relaxed text-muted-foreground/80">
           <p className="m-0">
-            Live Yahoo Finance data · rule-of-thumb valuation screens · educational tool only, not financial advice.
-            {" · "}
-            Built by{" "}
+            Live Yahoo financial data · educational tool · built by{" "}
             <a
               href="https://martinandrle.com"
               target="_blank"
@@ -3325,7 +3321,6 @@ export default function Tausta() {
             >
               Martin Andrle
             </a>
-            .
           </p>
           <details className="mt-2">
             <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
