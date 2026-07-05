@@ -1,4 +1,4 @@
-import { fetchStreetData, writeSentimentTldr } from "../_lib/yahoo.js";
+import { fetchStreetData, writeSentimentSummary } from "../_lib/yahoo.js";
 
 export default async function handler(req, res) {
   const ticker = (req.query.ticker || "").trim();
@@ -12,11 +12,15 @@ export default async function handler(req, res) {
   try {
     const data = await fetchStreetData(ticker);
     const apiKey = process.env.ANTHROPIC_API_KEY;
-    const tldr = await writeSentimentTldr(apiKey, ticker, data).catch(() => null);
+    const summary = await writeSentimentSummary(apiKey, ticker, data)
+      .catch(() => ({ tldr: null, headlineSentiments: [] }));
     res.status(200).json({
-      tldr,
+      tldr: summary.tldr,
       tldrAvailable: Boolean(apiKey),
-      news: data.news.slice(0, 5).map(({ title, publisher, link, time }) => ({ title, publisher, link, time })),
+      news: data.news.slice(0, 5).map(({ title, publisher, link, time }, i) => ({
+        title, publisher, link, time,
+        sentiment: summary.headlineSentiments[i] || null,
+      })),
       stocktwits: data.stocktwits
         ? { total: data.stocktwits.total, bullish: data.stocktwits.bullish, bearish: data.stocktwits.bearish }
         : null,
