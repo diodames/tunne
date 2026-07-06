@@ -4,6 +4,8 @@
 
 Search up to three symbols, choose **strategy presets** or toggle individual methods, and get a tagged verdict per strategy.
 
+Use **Screener** (`/screener`) to browse a pre-computed S&P 500 ranking from the local batch job — filter by sector, verdict count, and quality scores.
+
 ## What it does
 
 Enter a ticker (or company name — e.g. `AAPL`, `Tesla`, `PETR4.SA`) and Tausta builds a report with:
@@ -107,6 +109,61 @@ npm run preview
 Preview serves the built app at [http://localhost:4173](http://localhost:4173) by default.
 
 The repo includes a `vercel.json` for [Vercel](https://vercel.com/) deploys. Set `ANTHROPIC_API_KEY` in the project environment variables on Vercel for AI features in production.
+
+## Discovery screener (S&P 500 batch)
+
+Tausta can screen the full S&P 500 using a **local batch job** that reuses the same strategy engine. Results are exported to `data/latest-run.json` and served by `/api/screener` (no database on Vercel).
+
+### Workflow
+
+1. **Universe** — `universe/sp500.csv` (refresh monthly):
+
+   ```bash
+   npm run universe:refresh
+   ```
+
+2. **Batch run** — analyzes each ticker with throttling (~25–35 min for full universe):
+
+   ```bash
+   npm run batch:test   # first 5 tickers (smoke test)
+   npm run batch        # full S&P 500
+   npm run batch:resume # continue an interrupted run
+   ```
+
+   Progress is stored in local SQLite (`data/tausta.db`, gitignored). On completion, `data/latest-run.json` is updated.
+
+3. **Deploy screener data** — commit `data/latest-run.json` so production `/screener` has data:
+
+   ```bash
+   git add data/latest-run.json && git commit -m "Update screener batch"
+   ```
+
+4. **Browse** — open [/screener](http://localhost:5173/screener) for filters, presets, and ranking. Row click opens live ticker analysis at `/?t=TICKER`.
+
+### Screener presets
+
+| Preset | Filters |
+| --- | --- |
+| Deep value | ≥6 undervalued verdicts, sort by count |
+| Quality + cheap | ≥4 undervalued, F-Score ≥6 |
+| Contrarian | ≥5 undervalued, Altman distress zone |
+
+### Scheduling (Option 1 — JSON + cron)
+
+A helper script runs the batch, commits `data/latest-run.json` when it changes, and pushes to `main`:
+
+```bash
+npm run batch:nightly   # manual run (same as cron)
+```
+
+Install the weeknight cron job (2:00 AM Mon–Fri, logs to `data/nightly-batch.log`):
+
+```bash
+chmod +x scripts/nightly-batch.sh
+(crontab -l 2>/dev/null; echo "0 2 * * 1-5 /Users/diodames/git-local/stock-screener/scripts/nightly-batch.sh") | crontab -
+```
+
+Verify: `crontab -l`
 
 ## Stack
 

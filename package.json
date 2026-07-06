@@ -5,18 +5,25 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "batch": "node scripts/run-batch.mjs",
+    "batch:resume": "node scripts/run-batch.mjs --resume",
+    "batch:test": "node scripts/run-batch.mjs --limit 5",
+    "batch:nightly": "bash scripts/nightly-batch.sh",
+    "universe:refresh": "node universe/refresh-sp500.mjs"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.9",
     "@fontsource-variable/geist-mono": "^5.2.8",
     "@tailwindcss/vite": "^4.3.2",
+    "better-sqlite3": "^12.11.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.23.0",
     "radix-ui": "^1.6.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-router-dom": "^7.18.1",
     "recharts": "^3.8.0",
     "shadcn": "^4.12.0",
     "tailwind-merge": "^3.6.0",

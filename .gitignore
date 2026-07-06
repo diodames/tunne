@@ -3,3 +3,7 @@ dist
 .env
 .env.local
 .vercel
+data/tausta.db
+data/tausta.db-wal
+data/tausta.db-shm
+data/nightly-batch.log
