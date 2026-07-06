@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { BadgePercentIcon, BookmarkIcon, Building2Icon, ChartLineIcon, CheckIcon, ChevronDownIcon, CoinsIcon, CompassIcon, GraduationCapIcon, InfoIcon, LandmarkIcon, LayersIcon, Link2Icon, MegaphoneIcon, ScaleIcon, SearchIcon, ShieldAlertIcon, SlidersHorizontalIcon, TrendingUpIcon, TriangleAlertIcon, XIcon } from "lucide-react";
 import { Area, AreaChart, Line, LineChart, ReferenceLine, XAxis, YAxis } from "recharts";
 
@@ -2857,47 +2858,73 @@ function TickerSearchInput({ value, onChange, onSubmit, running }) {
 
 function StarterPanel({ running, onAnalyze, onApplyPersona }) {
   return (
-    <div className="rise mt-8" style={{ animationDelay: "300ms" }}>
-      <SectionLabel className="mb-3">Get started</SectionLabel>
+    <>
+      <div className="rise mt-8" style={{ animationDelay: "300ms" }}>
+        <SectionLabel className="mb-3">Get started</SectionLabel>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {STARTER_PRESETS.map((preset) => {
-          const Icon = preset.icon;
-          return (
-          <button
-            key={preset.id}
-            type="button"
-            disabled={running}
-            onClick={() => {
-              if (preset.persona && onApplyPersona) onApplyPersona(preset.persona);
-              onAnalyze(preset.tickers);
-            }}
-            className={cn(
-              "group flex min-w-0 flex-col items-start gap-1 rounded-[12px] bg-card px-3.5 py-2.5 text-left",
-              "ring-1 ring-foreground/10 transition-[box-shadow,ring-color] hover:ring-foreground/20",
-              "active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50",
-            )}
-          >
-            <span className="flex size-7 items-center justify-center overflow-visible rounded-lg bg-muted/50 ring-1 ring-foreground/10 transition-colors group-hover:bg-muted/80">
-              <Icon
-                className={cn(
-                  "size-3.5 text-muted-foreground",
-                  "transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)]",
-                  STARTER_ICON_HOVER[preset.id],
-                )}
-                aria-hidden
-              />
-            </span>
-            <span className="text-sm font-medium">{preset.label}</span>
-            <span className="font-mono text-xs tabular-nums text-muted-foreground">
-              {preset.tickers.join(" · ")}
-            </span>
-            <span className="text-[11px] text-muted-foreground/80">{preset.hint}</span>
-          </button>
-          );
-        })}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {STARTER_PRESETS.map((preset) => {
+            const Icon = preset.icon;
+            return (
+            <button
+              key={preset.id}
+              type="button"
+              disabled={running}
+              onClick={() => {
+                if (preset.persona && onApplyPersona) onApplyPersona(preset.persona);
+                onAnalyze(preset.tickers);
+              }}
+              className={cn(
+                "group flex min-w-0 flex-col items-start gap-1 rounded-[12px] bg-card px-3.5 py-2.5 text-left",
+                "ring-1 ring-foreground/10 transition-[box-shadow,ring-color] hover:ring-foreground/20",
+                "active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50",
+              )}
+            >
+              <span className="flex size-7 items-center justify-center overflow-visible rounded-lg bg-muted/50 ring-1 ring-foreground/10 transition-colors group-hover:bg-muted/80">
+                <Icon
+                  className={cn(
+                    "size-3.5 text-muted-foreground",
+                    "transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)]",
+                    STARTER_ICON_HOVER[preset.id],
+                  )}
+                  aria-hidden
+                />
+              </span>
+              <span className="text-sm font-medium">{preset.label}</span>
+              <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                {preset.tickers.join(" · ")}
+              </span>
+              <span className="text-[11px] text-muted-foreground/80">{preset.hint}</span>
+            </button>
+            );
+          })}
+        </div>
       </div>
-    </div>
+
+      <div className="rise mt-6" style={{ animationDelay: "400ms" }}>
+        <SectionLabel className="mb-3">Screener</SectionLabel>
+        <Link
+          to="/screener"
+          className={cn(
+            "group flex min-w-0 flex-col items-start gap-1 rounded-[12px] bg-card px-3.5 py-2.5",
+            "ring-1 ring-foreground/10 transition-[box-shadow,ring-color] hover:ring-foreground/20",
+            "active:scale-[0.99]",
+          )}
+        >
+          <span className="flex size-7 items-center justify-center overflow-visible rounded-lg bg-muted/50 ring-1 ring-foreground/10 transition-colors group-hover:bg-muted/80">
+            <SearchIcon
+              className="size-3.5 text-muted-foreground transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)] group-hover:scale-110"
+              aria-hidden
+            />
+          </span>
+          <span className="text-sm font-medium">Browse S&amp;P 500 rankings</span>
+          <span className="font-mono text-xs tabular-nums text-muted-foreground">500 tickers · batch run</span>
+          <span className="text-[11px] text-muted-foreground/80">
+            Filter by sector, verdict count, and quality scores — row click opens live analysis
+          </span>
+        </Link>
+      </div>
+    </>
   );
 }
 
