@@ -11,6 +11,7 @@ import {
   searchYahooSymbols,
   writeSentimentSummary,
 } from "./api/_lib/yahoo.js";
+import { loadLatestRun, parseScreenerParams, queryScreener } from "./api/_lib/screener.js";
 
 function apiRoutes(apiKey) {
   return {
@@ -104,6 +105,43 @@ function apiRoutes(apiKey) {
           res.end(JSON.stringify(results));
         } catch (err) {
           res.statusCode = 502;
+          res.end(JSON.stringify({ error: { message: err.message } }));
+        }
+      });
+
+      // GET /api/screener/meta — latest batch run metadata
+      server.middlewares.use("/api/screener/meta", async (req, res) => {
+        res.setHeader("Content-Type", "application/json");
+        try {
+          const snapshot = loadLatestRun();
+          res.end(JSON.stringify({
+            runId: snapshot.runId,
+            asOf: snapshot.asOf,
+            startedAt: snapshot.startedAt,
+            finishedAt: snapshot.finishedAt,
+            strategySet: snapshot.strategySet,
+            tickersOk: snapshot.tickersOk,
+            tickersFailed: snapshot.tickersFailed,
+            rowCount: snapshot.rows?.length ?? 0,
+          }));
+        } catch (err) {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ error: { message: err.message } }));
+        }
+      });
+
+      // GET /api/screener — filtered screener rows from latest-run.json
+      server.middlewares.use("/api/screener", async (req, res) => {
+        if ((req.url || "").startsWith("/meta")) return;
+        res.setHeader("Content-Type", "application/json");
+        try {
+          const params = parseScreenerParams(new URLSearchParams((req.url || "").split("?")[1] || ""));
+          const snapshot = loadLatestRun();
+          const result = queryScreener(snapshot, params);
+          const sectors = [...new Set((snapshot.rows || []).map((r) => r.sector).filter(Boolean))].sort();
+          res.end(JSON.stringify({ ...result, sectors }));
+        } catch (err) {
+          res.statusCode = 500;
           res.end(JSON.stringify({ error: { message: err.message } }));
         }
       });
