@@ -2447,51 +2447,74 @@ function ScoreInsightPanel({ d, results }) {
   );
 }
 
+function reportStrategyResults(report, selected) {
+  if (report.status !== "done" || !report.data) return [];
+  const active = STRATEGIES.filter((s) => selected.has(s.id));
+  return active.map((strat) => ({ strat, result: strat.evaluate(report.data) }));
+}
+
+function CompareCell({ active, tooltipTitle, tooltipDetail, children, className }) {
+  const cellClass = cn(
+    "px-2.5 py-1 text-right font-mono text-xs tabular-nums text-foreground transition-colors",
+    active && "bg-secondary/40",
+    (tooltipTitle || tooltipDetail) && "cursor-help",
+    className,
+  );
+
+  if (!tooltipTitle && !tooltipDetail) {
+    return <td className={cellClass}>{children}</td>;
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <td className={cellClass}>{children}</td>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-xs font-sans normal-case tracking-normal">
+        <div className="flex flex-col gap-0.5">
+          {tooltipTitle && <span className="font-medium">{tooltipTitle}</span>}
+          {tooltipDetail && <span className="text-background/80">{tooltipDetail}</span>}
+        </div>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 function CompareTable({ reports, selected, activeTicker }) {
   const done = reports.filter((r) => r.status === "done" && r.data);
   if (done.length < 2) return null;
-  const active = STRATEGIES.filter((s) => selected.has(s.id));
 
-  const rows = [
-    { label: "Score", render: (r) => {
-      const c = reportComposite(r, selected);
-      return c ? (
-        <span className={cn("font-display font-bold tabular-nums", KIND_META[c.band.kind].text)}>
-          {c.value}
-        </span>
-      ) : "—";
-    }},
-    { label: "Verdict", render: (r) => {
-      const c = reportComposite(r, selected);
-      return c ? <Tag kind={c.band.kind} label={c.band.label} /> : "—";
-    }},
-    { label: "P/E", render: (r) => fmt(r.data.pe_ttm) },
-    { label: "P/FCF", render: (r) => fmt(r.data.p_fcf) },
-    { label: "EV/EBITDA", render: (r) => fmt(r.data.ev_ebitda) },
-    { label: "Yield", render: (r) => isNum(r.data.dividend_yield_pct) ? `${fmt(r.data.dividend_yield_pct)}%` : "—" },
-    { label: "F-Score", render: (r) => isNum(r.data.piotroski) ? `${r.data.piotroski}/9` : "—" },
-    { label: "Z-Score", render: (r) => fmt(r.data.altman_z) },
+  const metricRows = [
+    { label: "P/E", strategyId: "pe_industry", render: (r) => fmt(r.data.pe_ttm) },
+    { label: "P/FCF", strategyId: "pfcf", render: (r) => fmt(r.data.p_fcf) },
+    { label: "EV/EBITDA", strategyId: "ev_ebitda", render: (r) => fmt(r.data.ev_ebitda) },
+    { label: "Yield", strategyId: "dividend", render: (r) => isNum(r.data.dividend_yield_pct) ? `${fmt(r.data.dividend_yield_pct)}%` : "—" },
+    { label: "F-Score", strategyId: "piotroski", render: (r) => isNum(r.data.piotroski) ? `${r.data.piotroski}/9` : "—" },
+    { label: "Z-Score", strategyId: "altman", render: (r) => fmt(r.data.altman_z) },
   ];
+
+  const strategyById = (id) => STRATEGIES.find((s) => s.id === id);
 
   return (
     <Card className="rise mt-3 gap-0 overflow-x-auto py-0">
-      <div className="border-b px-4 py-2.5">
-        <SectionLabel major>Side-by-side comparison</SectionLabel>
-        <p className="m-0 mt-0.5 text-[11px] text-muted-foreground">
-          Highlighted column matches the detail view below
+      <div className="border-b px-3 py-1.5">
+        <SectionLabel major className="text-xs">Side-by-side comparison</SectionLabel>
+        <p className="m-0 mt-0.5 text-[10px] text-muted-foreground">
+          Highlighted column matches the detail view below · hover cells for verdict context
         </p>
       </div>
-      <table className="w-full min-w-[480px] border-collapse text-sm">
+      <TooltipProvider>
+      <table className="w-full min-w-[420px] border-collapse text-xs">
         <thead>
           <tr className="border-b">
-            <th className="sticky left-0 z-10 bg-card px-4 py-2 text-left text-xs font-medium text-muted-foreground">
+            <th className="sticky left-0 z-10 bg-card px-2.5 py-1 text-left text-[11px] font-medium text-muted-foreground">
               Metric
             </th>
             {done.map((r) => (
               <th
                 key={r.ticker}
                 className={cn(
-                  "px-4 py-2 text-right font-mono text-xs font-medium tabular-nums transition-colors",
+                  "px-2.5 py-1 text-right font-mono text-[11px] font-medium tabular-nums transition-colors",
                   activeTicker === r.ticker && "bg-secondary/60 text-foreground",
                 )}
               >
@@ -2501,26 +2524,74 @@ function CompareTable({ reports, selected, activeTicker }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
+          <tr className="border-b border-border/60">
+            <td className="sticky left-0 z-10 bg-card px-2.5 py-1 text-[11px] text-muted-foreground">Score</td>
+            {done.map((r) => {
+              const composite = reportComposite(r, selected);
+              const results = reportStrategyResults(r, selected);
+              return (
+                <CompareCell
+                  key={r.ticker}
+                  active={activeTicker === r.ticker}
+                  tooltipTitle={composite?.band.label}
+                  tooltipDetail={
+                    composite
+                      ? `Score ${composite.value}/100 · ${compositeScoreSummary(composite, results) || `Based on ${composite.counted} checks`}`
+                      : undefined
+                  }
+                >
+                  {composite ? (
+                    <span className="font-display font-bold text-white">{composite.value}</span>
+                  ) : "—"}
+                </CompareCell>
+              );
+            })}
+          </tr>
+          <tr className="border-b border-border/60">
+            <td className="sticky left-0 z-10 bg-card px-2.5 py-1 text-[11px] text-muted-foreground">Verdict</td>
+            {done.map((r) => {
+              const composite = reportComposite(r, selected);
+              const results = reportStrategyResults(r, selected);
+              return (
+                <CompareCell
+                  key={r.ticker}
+                  active={activeTicker === r.ticker}
+                  tooltipTitle={composite?.band.label}
+                  tooltipDetail={
+                    composite
+                      ? compositeScoreSummary(composite, results) || `Weighted average of ${composite.counted} selected checks`
+                      : undefined
+                  }
+                >
+                  {composite ? <Tag kind={composite.band.kind} label={composite.band.label} /> : "—"}
+                </CompareCell>
+              );
+            })}
+          </tr>
+          {metricRows.map((row) => (
             <tr key={row.label} className="border-b border-border/60 last:border-0">
-              <td className="sticky left-0 z-10 bg-card px-4 py-2 text-xs text-muted-foreground">
+              <td className="sticky left-0 z-10 bg-card px-2.5 py-1 text-[11px] text-muted-foreground">
                 {row.label}
               </td>
-              {done.map((r) => (
-                <td
-                  key={r.ticker}
-                  className={cn(
-                    "px-4 py-2 text-right font-mono text-sm tabular-nums transition-colors",
-                    activeTicker === r.ticker && "bg-secondary/40",
-                  )}
-                >
-                  {row.render(r)}
-                </td>
-              ))}
+              {done.map((r) => {
+                const strat = strategyById(row.strategyId);
+                const result = strat?.evaluate(r.data);
+                return (
+                  <CompareCell
+                    key={r.ticker}
+                    active={activeTicker === r.ticker}
+                    tooltipTitle={result ? KIND_META[result.kind].label : undefined}
+                    tooltipDetail={result?.detail}
+                  >
+                    {row.render(r)}
+                  </CompareCell>
+                );
+              })}
             </tr>
           ))}
         </tbody>
       </table>
+      </TooltipProvider>
     </Card>
   );
 }
@@ -2692,31 +2763,33 @@ function StrategyRow({ strat, result }) {
       onOpenChange={setOpen}
       className="rounded-lg py-2.5 transition-colors hover:bg-muted/30"
     >
-      <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-start gap-x-2 gap-y-1">
-        <span className="text-sm font-medium leading-snug">{strat.name}</span>
-        <Tag kind={result.kind} filled />
-        <CollapsibleTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            aria-label="Method notes"
-            className="relative -mr-1 text-muted-foreground after:absolute after:-inset-2"
-          >
-            <ChevronDownIcon className={cn("size-3.5 transition-transform", open && "rotate-180")} />
-          </Button>
-        </CollapsibleTrigger>
-      </div>
-      {!isNa && (
-        <p className="mt-1 mb-0 text-[13px] leading-snug text-pretty">
-          <span className="font-mono tabular-nums">{primary}</span>
-          {secondary && (
-            <>
-              <span className="text-muted-foreground"> · </span>
-              <span className="text-muted-foreground">{secondary}</span>
-            </>
+      <CollapsibleTrigger asChild>
+        <button
+          type="button"
+          aria-label="Method notes"
+          className="w-full cursor-pointer rounded-lg text-left"
+        >
+          <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-start gap-x-2 gap-y-1">
+            <span className="text-sm font-medium leading-snug">{strat.name}</span>
+            <Tag kind={result.kind} filled />
+            <ChevronDownIcon
+              className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")}
+              aria-hidden
+            />
+          </div>
+          {!isNa && (
+            <p className="mt-1 mb-0 text-[13px] leading-snug text-pretty">
+              <span className="font-mono tabular-nums">{primary}</span>
+              {secondary && (
+                <>
+                  <span className="text-muted-foreground"> · </span>
+                  <span className="text-muted-foreground">{secondary}</span>
+                </>
+              )}
+            </p>
           )}
-        </p>
-      )}
+        </button>
+      </CollapsibleTrigger>
       <CollapsibleContent className="overflow-hidden data-[state=open]:animate-[vl-collapse-open_200ms_cubic-bezier(0.2,0,0,1)] data-[state=closed]:animate-[vl-collapse-close_150ms_cubic-bezier(0.2,0,0,1)]">
         <div className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
           <p className="m-0 flex items-center justify-start gap-2">
