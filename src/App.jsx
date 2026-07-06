@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { BadgePercentIcon, BookmarkIcon, Building2Icon, ChartLineIcon, CheckIcon, ChevronDownIcon, CoinsIcon, CompassIcon, GraduationCapIcon, InfoIcon, LandmarkIcon, LayersIcon, Link2Icon, MegaphoneIcon, ScaleIcon, SearchIcon, ShieldAlertIcon, SlidersHorizontalIcon, TrendingUpIcon, TriangleAlertIcon, XIcon } from "lucide-react";
 import { Area, AreaChart, Line, LineChart, ReferenceLine, XAxis, YAxis } from "recharts";
 
@@ -610,25 +610,113 @@ function rangeTrackAriaLabel(pos, expectedSummary) {
 function rangeTrackTickStyle(fraction) {
   return { left: `calc(${fraction * 100}% - 1px)` };
 }
-/** Align a label row with the track tick at `fraction` (same horizontal anchor). */
-function rangeMarkerPlacement(fraction) {
+/** Align a label row with the track tick at `fraction`, clamped so it stays within the bar. */
+function rangeMarkerBoundedPlacement(fraction, halfWidthPx, barWidthPx, mode = "auto") {
   const clamped = Math.min(1, Math.max(0, fraction));
-  if (clamped <= 0.12) {
-    return { style: { left: 0 }, align: "start" };
+  const width = barWidthPx > 0 ? barWidthPx : 400;
+  const half = halfWidthPx / width;
+  const full = half * 2;
+  const useStart = mode === "start" || (mode === "auto" && clamped <= 0.12);
+  const useEnd = mode === "end" || (mode === "auto" && clamped >= 0.88);
+
+  if (useStart) {
+    const anchor = Math.min(clamped, Math.max(0, 1 - full));
+    return { style: { left: `${anchor * 100}%`, transform: "translateX(0)" }, align: "start" };
   }
-  if (clamped >= 0.88) {
-    return { style: { right: 0, left: "auto" }, align: "end" };
+  if (useEnd) {
+    const anchor = Math.max(clamped, Math.min(1, full));
+    return { style: { left: `${anchor * 100}%`, transform: "translateX(-100%)" }, align: "end" };
   }
-  return {
-    style: { left: `${clamped * 100}%`, transform: "translateX(-50%)" },
-    align: "center",
-  };
+  const anchor = Math.min(1 - half, Math.max(half, clamped));
+  return { style: { left: `${anchor * 100}%`, transform: "translateX(-50%)" }, align: "center" };
+}
+
+function rangeMarkerPlacement(fraction, halfWidthPx, barWidthPx) {
+  return rangeMarkerBoundedPlacement(fraction, halfWidthPx, barWidthPx, "auto");
 }
 const RANGE_MARKER_ALIGN = {
   start: "text-left",
   center: "text-center",
   end: "text-right",
 };
+/** Approx half-width of marker labels at text-xs (px) — conservative for collision checks. */
+const RANGE_LABEL_HALF_WIDTH = { today: 24, expected: 58 };
+/** Approx half-width of track tick tooltips (px) — conservative for edge alignment. */
+const RANGE_TOOLTIP_HALF_WIDTH = { today: 52, expected: 88 };
+
+/** Horizontal span [start, end] in bar-fraction units for a marker label. */
+function rangeMarkerLabelSpan(fraction, halfWidthPx, barWidthPx, mode = "auto") {
+  const width = barWidthPx > 0 ? barWidthPx : 400;
+  const half = halfWidthPx / width;
+  const full = half * 2;
+  const clamped = Math.min(1, Math.max(0, fraction));
+  const useStart = mode === "start" || (mode === "auto" && clamped <= 0.12);
+  const useEnd = mode === "end" || (mode === "auto" && clamped >= 0.88);
+
+  if (useStart) {
+    const anchor = Math.min(clamped, Math.max(0, 1 - full));
+    return [anchor, anchor + full];
+  }
+  if (useEnd) {
+    const anchor = Math.max(clamped, Math.min(1, full));
+    return [anchor - full, anchor];
+  }
+  const anchor = Math.min(1 - half, Math.max(half, clamped));
+  return [anchor - half, anchor + half];
+}
+
+function rangeMarkersShareEdge(pos, tPos) {
+  return (pos >= 0.88 && tPos >= 0.88) || (pos <= 0.12 && tPos <= 0.12);
+}
+
+function rangeMarkerLabelsCollide(pos, tPos, barWidthPx) {
+  const width = barWidthPx > 0 ? barWidthPx : 400;
+  const gap = 4 / width;
+  const [todayStart, todayEnd] = rangeMarkerLabelSpan(pos, RANGE_LABEL_HALF_WIDTH.today, width);
+  const [expectedStart, expectedEnd] = rangeMarkerLabelSpan(tPos, RANGE_LABEL_HALF_WIDTH.expected, width);
+  return todayStart < expectedEnd + gap && expectedStart < todayEnd + gap;
+}
+
+function rangeTrackTooltipAlign(fraction, halfWidthPx, barWidthPx) {
+  const width = barWidthPx > 0 ? barWidthPx : 400;
+  const half = halfWidthPx / width;
+  const clamped = Math.min(1, Math.max(0, fraction));
+  if (clamped <= half) return "start";
+  if (clamped >= 1 - half) return "end";
+  return "center";
+}
+
+function RangeTrackTick({ style, tickClassName, ariaLabel, tooltip, fraction, collisionBoundary, barWidth = 0, tooltipHalfWidth = 80 }) {
+  const align = fraction != null && barWidth > 0
+    ? rangeTrackTooltipAlign(fraction, tooltipHalfWidth, barWidth)
+    : "center";
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-label={ariaLabel}
+          className={cn(
+            "absolute -inset-y-1 w-0.5 rounded-full after:absolute after:-inset-x-2.5 after:-inset-y-0.5 cursor-help",
+            tickClassName,
+          )}
+          style={style}
+        />
+      </TooltipTrigger>
+      <TooltipContent
+        side="top"
+        align={align}
+        collisionBoundary={collisionBoundary ?? undefined}
+        collisionPadding={8}
+        className="font-mono tabular-nums"
+      >
+        {tooltip}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 function verdict(kind, detail) { return { kind, detail }; }
 function na() { return { kind: "na", detail: "Data not available for this metric" }; }
 
@@ -1021,25 +1109,71 @@ function fundamentalsStats(d) {
 }
 
 function PriceRangeSection({ d }) {
+  const barRef = useRef(null);
+  const todayLabelRef = useRef(null);
+  const expectedLabelRef = useRef(null);
+  const [barWidth, setBarWidth] = useState(0);
+  const [measuredCollide, setMeasuredCollide] = useState(false);
+
   const hasRange = isNum(d.week52_low) && isNum(d.week52_high) && isNum(d.price) && d.week52_high > d.week52_low;
+  const pos = hasRange
+    ? Math.min(1, Math.max(0, (d.price - d.week52_low) / (d.week52_high - d.week52_low)))
+    : 0;
+  const tPos =
+    hasRange && isNum(d.analyst_target)
+      ? Math.min(1, Math.max(0, (d.analyst_target - d.week52_low) / (d.week52_high - d.week52_low)))
+      : null;
+  const hasTarget = isNum(d.analyst_target);
+  const rawTPos =
+    hasRange && hasTarget ? (d.analyst_target - d.week52_low) / (d.week52_high - d.week52_low) : null;
+  const targetInRange = hasTarget && rawTPos !== null && rawTPos >= 0 && rawTPos <= 1;
+  const expectedSummary = hasRange ? rangeVsExpectedSummary(d) : null;
+  const nearTarget = expectedSummary?.below === null && targetInRange;
+  const predictedCollide =
+    hasRange &&
+    hasTarget &&
+    tPos !== null &&
+    ((targetInRange && nearTarget) ||
+      rangeMarkersShareEdge(pos, tPos) ||
+      rangeMarkerLabelsCollide(pos, tPos, barWidth));
+
+  useEffect(() => {
+    const el = barRef.current;
+    if (!el) return;
+    const update = () => setBarWidth(el.getBoundingClientRect().width);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  useLayoutEffect(() => {
+    if (predictedCollide || !hasRange || !hasTarget || tPos === null) {
+      setMeasuredCollide(false);
+      return;
+    }
+    const todayEl = todayLabelRef.current;
+    const expectedEl = expectedLabelRef.current;
+    if (!todayEl || !expectedEl) {
+      setMeasuredCollide(false);
+      return;
+    }
+    const todayBox = todayEl.getBoundingClientRect();
+    const expectedBox = expectedEl.getBoundingClientRect();
+    const overlap = todayBox.left < expectedBox.right - 2 && expectedBox.left < todayBox.right - 2;
+    setMeasuredCollide(overlap);
+  }, [predictedCollide, hasRange, hasTarget, tPos, pos, barWidth, d.price, d.analyst_target]);
+
   if (!hasRange) return null;
 
-  const pos = Math.min(1, Math.max(0, (d.price - d.week52_low) / (d.week52_high - d.week52_low)));
-  const tPos = isNum(d.analyst_target)
-    ? Math.min(1, Math.max(0, (d.analyst_target - d.week52_low) / (d.week52_high - d.week52_low)))
-    : null;
   const summary = rangePlainSummary(d, pos);
-  const expectedSummary = rangeVsExpectedSummary(d);
-  const hasTarget = isNum(d.analyst_target);
-  const rawTPos = hasTarget
-    ? (d.analyst_target - d.week52_low) / (d.week52_high - d.week52_low)
-    : null;
-  const targetInRange = hasTarget && rawTPos >= 0 && rawTPos <= 1;
   const targetAboveHigh = hasTarget && rawTPos > 1;
   const targetBelowLow = hasTarget && rawTPos < 0;
-  const labelsClose = targetInRange && tPos !== null && Math.abs(pos - tPos) < 0.12;
-  const todayMarker = rangeMarkerPlacement(pos);
-  const expectedMarker = hasTarget ? rangeMarkerPlacement(tPos ?? 0) : null;
+  const labelsCollide = predictedCollide || measuredCollide;
+  const todayMarker = rangeMarkerPlacement(pos, RANGE_LABEL_HALF_WIDTH.today, barWidth);
+  const expectedMarker = hasTarget
+    ? rangeMarkerPlacement(tPos ?? 0, RANGE_LABEL_HALF_WIDTH.expected, barWidth)
+    : null;
 
   return (
     <div className="border-b bg-background/60 px-4 py-3">
@@ -1067,104 +1201,199 @@ function PriceRangeSection({ d }) {
         </div>
 
         <p className="m-0 mt-1.5 text-sm text-foreground/90">{summary.headline}</p>
-        <p className="m-0 mt-0.5 font-mono text-xs tabular-nums text-muted-foreground">
-          {summary.detail}
-          {expectedSummary && ` · ${expectedSummary.line}`}
+        <p
+          className={cn(
+            "m-0 mt-0.5 font-mono text-xs tabular-nums text-muted-foreground",
+            labelsCollide && hasTarget && "flex flex-wrap items-center justify-between gap-x-3 gap-y-1",
+          )}
+        >
+          <span>
+            {summary.detail}
+            {expectedSummary && ` · ${expectedSummary.line}`}
+          </span>
+          {labelsCollide && hasTarget && (
+            <span className="inline-flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="inline-flex items-center gap-1">
+                <span className="h-3 w-0.5 shrink-0 rounded-full bg-foreground" aria-hidden />
+                Today · {fmtMoney(d.price, d.currency)}
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="h-3 w-0.5 shrink-0 rounded-full bg-muted-foreground/70" aria-hidden />
+                Expected
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label="What is the expected price?"
+                        className="relative cursor-help text-muted-foreground/70 transition-colors hover:text-foreground after:absolute after:-inset-2"
+                      >
+                        <InfoIcon className="size-3" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-56 font-sans normal-case tracking-normal">
+                      Average 12-month price target across the analysts covering this stock — a
+                      consensus estimate of fair value, not a guarantee.
+                      {(targetAboveHigh || targetBelowLow) && (
+                        <span className="mt-1 block text-background/80">
+                          {targetAboveHigh
+                            ? "Above the 52-week high — pinned to bar end"
+                            : "Below the 52-week low — pinned to bar start"}
+                        </span>
+                      )}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                · {fmtMoney(d.analyst_target, d.currency)}
+              </span>
+            </span>
+          )}
         </p>
 
+        <TooltipProvider>
         <div
-          className="relative mt-3 h-2 rounded-full bg-border"
+          ref={barRef}
+          className="relative mt-3 h-1.5 rounded-full bg-border"
           role="img"
           aria-label={rangeTrackAriaLabel(pos, expectedSummary)}
         >
-          <div
-            className="absolute -inset-y-1 w-0.5 rounded-full bg-foreground"
+          <RangeTrackTick
             style={rangeTrackTickStyle(pos)}
+            tickClassName="bg-foreground"
+            fraction={pos}
+            collisionBoundary={barRef.current}
+            barWidth={barWidth}
+            tooltipHalfWidth={RANGE_TOOLTIP_HALF_WIDTH.today}
+            ariaLabel={`Today · ${fmtMoney(d.price, d.currency)}`}
+            tooltip={
+              <>
+                <span className="block">Today · {fmtMoney(d.price, d.currency)}</span>
+                <span className="block text-background/80">{pct(pos)} of 52-week range</span>
+              </>
+            }
           />
           {targetInRange && tPos !== null && (
-            <div
-              className="absolute -inset-y-1 w-0.5 rounded-full bg-muted-foreground/70"
+            <RangeTrackTick
               style={rangeTrackTickStyle(tPos)}
+              tickClassName="bg-muted-foreground/70"
+              fraction={tPos}
+              collisionBoundary={barRef.current}
+              barWidth={barWidth}
+              tooltipHalfWidth={RANGE_TOOLTIP_HALF_WIDTH.expected}
+              ariaLabel={`Expected · ${fmtMoney(d.analyst_target, d.currency)}`}
+              tooltip={
+                <>
+                  <span className="block">Expected · {fmtMoney(d.analyst_target, d.currency)}</span>
+                  <span className="block text-background/80">{pct(tPos)} of 52-week range</span>
+                </>
+              }
             />
           )}
           {hasTarget && targetAboveHigh && (
-            <div
-              className="absolute -inset-y-1 w-0.5 rounded-full bg-muted-foreground/70"
+            <RangeTrackTick
               style={{ left: "calc(100% - 1px)" }}
+              tickClassName="bg-muted-foreground/70"
+              fraction={1}
+              collisionBoundary={barRef.current}
+              barWidth={barWidth}
+              tooltipHalfWidth={RANGE_TOOLTIP_HALF_WIDTH.expected}
+              ariaLabel={`Expected · ${fmtMoney(d.analyst_target, d.currency)}`}
+              tooltip={
+                <>
+                  <span className="block">Expected · {fmtMoney(d.analyst_target, d.currency)}</span>
+                  <span className="block text-background/80">Above the 52-week high — pinned to bar end</span>
+                </>
+              }
             />
           )}
           {hasTarget && targetBelowLow && (
-            <div
-              className="absolute -inset-y-1 w-0.5 rounded-full bg-muted-foreground/70"
+            <RangeTrackTick
               style={{ left: 0 }}
+              tickClassName="bg-muted-foreground/70"
+              fraction={0}
+              collisionBoundary={barRef.current}
+              barWidth={barWidth}
+              tooltipHalfWidth={RANGE_TOOLTIP_HALF_WIDTH.expected}
+              ariaLabel={`Expected · ${fmtMoney(d.analyst_target, d.currency)}`}
+              tooltip={
+                <>
+                  <span className="block">Expected · {fmtMoney(d.analyst_target, d.currency)}</span>
+                  <span className="block text-background/80">Below the 52-week low — pinned to bar start</span>
+                </>
+              }
             />
           )}
         </div>
+        </TooltipProvider>
 
-        <div className={cn("relative mt-2 font-mono text-xs tabular-nums", labelsClose ? "min-h-0" : "min-h-4")}>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span
-                  className={cn(
-                    "absolute top-0 cursor-default whitespace-nowrap",
-                    RANGE_MARKER_ALIGN[todayMarker.align],
-                  )}
-                  style={todayMarker.style}
-                >
-                  {!labelsClose && "Today"}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent className="font-mono tabular-nums">
-                Today · {fmtMoney(d.price, d.currency)}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          {expectedMarker && !labelsClose && (
-            <span
-              className={cn(
-                "absolute top-0 inline-flex items-center gap-1 whitespace-nowrap text-muted-foreground",
-                RANGE_MARKER_ALIGN[expectedMarker.align],
-              )}
-              style={expectedMarker.style}
-            >
+        {!(labelsCollide && hasTarget) && (
+        <div className="relative mt-2 min-h-4 overflow-x-clip font-mono text-xs tabular-nums">
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <span className="cursor-default">Expected</span>
+                    <span
+                      ref={todayLabelRef}
+                      className={cn(
+                        "absolute top-0 cursor-default whitespace-nowrap",
+                        RANGE_MARKER_ALIGN[todayMarker.align],
+                      )}
+                      style={todayMarker.style}
+                    >
+                      Today
+                    </span>
                   </TooltipTrigger>
                   <TooltipContent className="font-mono tabular-nums">
-                    Expected · {fmtMoney(d.analyst_target, d.currency)}
-                    {(targetAboveHigh || targetBelowLow) && (
-                      <span className="mt-1 block text-background/80">
-                        {targetAboveHigh
-                          ? "Above the 52-week high — pinned to bar end"
-                          : "Below the 52-week low — pinned to bar start"}
-                      </span>
-                    )}
+                    Today · {fmtMoney(d.price, d.currency)}
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      aria-label="What is the expected price?"
-                      className="relative cursor-help text-muted-foreground/70 transition-colors hover:text-foreground after:absolute after:-inset-2"
-                    >
-                      <InfoIcon className="size-3" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-56 font-sans normal-case tracking-normal">
-                    Average 12-month price target across the analysts covering this stock — a
-                    consensus estimate of fair value, not a guarantee.
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </span>
-          )}
+              {expectedMarker && (
+                <span
+                  ref={expectedLabelRef}
+                  className={cn(
+                    "absolute top-0 inline-flex items-center gap-1 whitespace-nowrap text-muted-foreground",
+                    RANGE_MARKER_ALIGN[expectedMarker.align],
+                  )}
+                  style={expectedMarker.style}
+                >
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="cursor-default">Expected</span>
+                      </TooltipTrigger>
+                      <TooltipContent className="font-mono tabular-nums">
+                        Expected · {fmtMoney(d.analyst_target, d.currency)}
+                        {(targetAboveHigh || targetBelowLow) && (
+                          <span className="mt-1 block text-background/80">
+                            {targetAboveHigh
+                              ? "Above the 52-week high — pinned to bar end"
+                              : "Below the 52-week low — pinned to bar start"}
+                          </span>
+                        )}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          aria-label="What is the expected price?"
+                          className="relative cursor-help text-muted-foreground/70 transition-colors hover:text-foreground after:absolute after:-inset-2"
+                        >
+                          <InfoIcon className="size-3" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-56 font-sans normal-case tracking-normal">
+                        Average 12-month price target across the analysts covering this stock — a
+                        consensus estimate of fair value, not a guarantee.
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </span>
+              )}
         </div>
+        )}
 
         <div className="mt-2 flex justify-between gap-4 font-mono text-xs tabular-nums text-muted-foreground">
           <span>
@@ -1650,15 +1879,15 @@ const PUBLISHER_DOMAINS = {
 
 function stocktwitsMoodMeta(tagged, bullPct) {
   if (tagged === 0) {
-    return { label: "No tags", badgeClass: "border border-border bg-secondary text-muted-foreground" };
+    return { label: "No tags", tagClass: "text-muted-foreground" };
   }
   if (bullPct >= 60) {
-    return { label: "Mostly bullish", badgeClass: "bg-under-soft text-under" };
+    return { label: "Mostly bullish", tagClass: "text-under" };
   }
   if (bullPct <= 40) {
-    return { label: "Mostly bearish", badgeClass: "bg-over-soft text-over" };
+    return { label: "Mostly bearish", tagClass: "text-over" };
   }
-  return { label: "Mixed", badgeClass: "bg-secondary text-muted-foreground" };
+  return { label: "Mixed", tagClass: "text-muted-foreground" };
 }
 
 function stocktwitsMoodSummary(st, bullPct, tagged) {
@@ -2008,9 +2237,9 @@ function SentimentPanel({ ticker, className }) {
           <div className="flex items-center justify-between gap-2">
             <SectionLabel>StockTwits mood</SectionLabel>
             <span className="inline-flex items-center gap-1">
-              <Badge className={cn("h-5 rounded-4xl px-2 font-mono text-[11px] font-medium tabular-nums", moodMeta.badgeClass)}>
+              <span className={cn("tag font-mono tabular-nums", moodMeta.tagClass)}>
                 {moodMeta.label}
-              </Badge>
+              </span>
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -2033,7 +2262,7 @@ function SentimentPanel({ ticker, className }) {
 
           {tagged > 0 ? (
             <div
-              className="mt-1.5 flex h-1.5 overflow-hidden rounded-full bg-border"
+              className="mt-1.5 flex h-1 overflow-hidden rounded-full bg-border"
               role="img"
               aria-label={`${st.bullish} bullish, ${st.bearish} bearish, ${untagged} untagged out of ${st.total} recent posts`}
             >
