@@ -387,7 +387,7 @@ const STARTER_PRESETS = [
   },
   {
     id: "growth",
-    icon: TrendingUpIcon,
+    icon: ScaleIcon,
     label: "Growth stress-test",
     tickers: ["NVDA", "META", "AMZN"],
     hint: "Rich P/E — any value case left?",
@@ -417,7 +417,7 @@ const STARTER_ICON_HOVER = {
   megacap: "group-hover:scale-105 group-hover:-translate-y-px",
   trap: "group-hover:rotate-12",
   dividend: "group-hover:-translate-y-0.5 group-hover:scale-105",
-  growth: "group-hover:scale-105 group-hover:-translate-y-px",
+  growth: "group-hover:-rotate-6 group-hover:scale-105",
   banks: "group-hover:scale-110",
   global: "group-hover:rotate-45",
 };
@@ -3212,7 +3212,7 @@ export default function Tausta() {
       <Toast toast={toast} />
       <div className="mx-auto max-w-5xl px-5 pb-20">
 
-        <div className="-mx-5 border-b border-border px-5 pt-6 pb-3 sm:pt-10 sm:pb-4">
+        <div className="border-b border-border pt-6 pb-3 sm:pt-10 sm:pb-4">
           <header className="rise">
             <h1 className="font-display mb-1 mt-0.5 text-3xl font-bold leading-tight">
               <button
