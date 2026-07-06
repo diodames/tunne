@@ -1609,6 +1609,18 @@ function timeAgo(t) {
   return `${Math.round(hours / 24)}d ago`;
 }
 
+function formatNewsPublished(t) {
+  if (!t) return "";
+  const hours = (Date.now() - t) / 3600000;
+  if (hours < 24 * 7) return timeAgo(t);
+  const d = new Date(t);
+  return d.toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+    ...(d.getFullYear() !== new Date().getFullYear() ? { year: "numeric" } : {}),
+  });
+}
+
 /* Yahoo aggregates most article links, so map publisher names to their real
    domains for the favicon stack; unknown publishers fall back to the link host. */
 const PUBLISHER_DOMAINS = {
@@ -1736,7 +1748,7 @@ function OutlookSection({ title, group, narrative }) {
       </div>
 
       <div
-        className="mt-2 flex h-2 overflow-hidden rounded-full bg-border"
+        className="mt-2 flex h-1 overflow-hidden rounded-full bg-border"
         role="img"
         aria-label={`${bullish} bullish, ${bearish} bearish, ${neutral} neutral signals`}
       >
@@ -1964,7 +1976,17 @@ function SentimentPanel({ ticker, className }) {
               >
                 {n.title}
               </a>
-              <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{n.publisher}</span>
+              <span className="shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground">
+                {n.publisher}
+                {n.time != null && (
+                  <>
+                    <span aria-hidden> · </span>
+                    <time dateTime={new Date(n.time).toISOString()} title={new Date(n.time).toLocaleString()}>
+                      {formatNewsPublished(n.time)}
+                    </time>
+                  </>
+                )}
+              </span>
             </li>
           ))}
         </ul>
@@ -2510,7 +2532,7 @@ function StrategyRow({ strat, result }) {
       )}
       <CollapsibleContent className="overflow-hidden data-[state=open]:animate-[vl-collapse-open_200ms_cubic-bezier(0.2,0,0,1)] data-[state=closed]:animate-[vl-collapse-close_150ms_cubic-bezier(0.2,0,0,1)]">
         <div className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
-          <p className="m-0 flex items-center gap-2">
+          <p className="m-0 flex items-center justify-start gap-2">
             <VerdictMarker kind={result.kind} />
             <span className="min-w-0">{strat.how}</span>
           </p>
@@ -2534,38 +2556,38 @@ function CompactStrategyRow({ strat, result }) {
       onOpenChange={setOpen}
       className="rounded-lg py-1.5 transition-colors hover:bg-muted/30"
     >
-      <div className={cn(
-        "grid items-center gap-x-2",
-        isNa ? "grid-cols-[minmax(0,1fr)_auto]" : "grid-cols-[minmax(0,1fr)_auto_auto]",
-      )}>
-        <span className="min-w-0 truncate text-sm leading-snug">
-          <span className="font-medium text-foreground">{strat.name}</span>
-          <span className="text-muted-foreground"> · </span>
-          <span
-            className={cn(
-              "text-xs tabular-nums",
-              isNa ? "text-muted-foreground" : "font-mono text-muted-foreground",
-            )}
-            title={detailText}
-          >
-            {detailText}
+      <CollapsibleTrigger asChild>
+        <button
+          type="button"
+          aria-label="Method notes"
+          className={cn(
+            "grid w-full cursor-pointer items-center gap-x-2 rounded-lg text-left",
+            isNa ? "grid-cols-[minmax(0,1fr)_auto]" : "grid-cols-[minmax(0,1fr)_auto_auto]",
+          )}
+        >
+          <span className="min-w-0 truncate text-sm leading-snug">
+            <span className="font-medium text-foreground">{strat.name}</span>
+            <span className="text-muted-foreground"> · </span>
+            <span
+              className={cn(
+                "text-xs tabular-nums",
+                isNa ? "text-muted-foreground" : "font-mono text-muted-foreground",
+              )}
+              title={detailText}
+            >
+              {detailText}
+            </span>
           </span>
-        </span>
-        {!isNa && <Tag kind={result.kind} filled />}
-        <CollapsibleTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            aria-label="Method notes"
-            className="relative -mr-1 text-muted-foreground after:absolute after:-inset-2"
-          >
-            <ChevronDownIcon className={cn("size-3.5 transition-transform", open && "rotate-180")} />
-          </Button>
-        </CollapsibleTrigger>
-      </div>
+          {!isNa && <Tag kind={result.kind} filled />}
+          <ChevronDownIcon
+            className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")}
+            aria-hidden
+          />
+        </button>
+      </CollapsibleTrigger>
       <CollapsibleContent className="overflow-hidden data-[state=open]:animate-[vl-collapse-open_200ms_cubic-bezier(0.2,0,0,1)] data-[state=closed]:animate-[vl-collapse-close_150ms_cubic-bezier(0.2,0,0,1)]">
         <div className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
-          <p className="m-0 flex items-center gap-2">
+          <p className="m-0 flex items-center justify-start gap-2">
             <VerdictMarker kind={result.kind} />
             <span className="min-w-0">{strat.how}</span>
           </p>
