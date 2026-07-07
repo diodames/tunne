@@ -8,9 +8,8 @@ export default async function handler(req, res) {
     const params = parseScreenerParams(url.searchParams);
     const snapshot = loadLatestRun();
     const result = queryScreener(snapshot, params);
-    const sectors = [...new Set((snapshot.rows || []).map((r) => r.sector).filter(Boolean))].sort();
 
-    res.status(200).json({ ...result, sectors });
+    res.status(200).json(result);
   } catch (err) {
     res.status(500).json({ error: { message: err.message } });
   }

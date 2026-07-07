@@ -13,6 +13,17 @@ export function openDb() {
   db.pragma("journal_mode = WAL");
   const schema = fs.readFileSync(SCHEMA_PATH, "utf8");
   db.exec(schema);
+  for (const sql of [
+    "ALTER TABLE ticker_results ADD COLUMN market_cap REAL",
+    "ALTER TABLE ticker_results ADD COLUMN p_fcf REAL",
+    "ALTER TABLE ticker_results ADD COLUMN week52_off_pct REAL",
+  ]) {
+    try {
+      db.exec(sql);
+    } catch {
+      // column already exists
+    }
+  }
   return db;
 }
 

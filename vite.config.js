@@ -138,8 +138,7 @@ function apiRoutes(apiKey) {
           const params = parseScreenerParams(new URLSearchParams((req.url || "").split("?")[1] || ""));
           const snapshot = loadLatestRun();
           const result = queryScreener(snapshot, params);
-          const sectors = [...new Set((snapshot.rows || []).map((r) => r.sector).filter(Boolean))].sort();
-          res.end(JSON.stringify({ ...result, sectors }));
+          res.end(JSON.stringify(result));
         } catch (err) {
           res.statusCode = 500;
           res.end(JSON.stringify({ error: { message: err.message } }));

@@ -29,8 +29,8 @@ export function saveTickerResult(db, runId, row, verdicts) {
     INSERT OR REPLACE INTO ticker_results (
       run_id, ticker, name, sector, price, composite_score,
       undervalued_count, fair_count, overvalued_count, caution_count,
-      quality_piotroski, quality_altman, as_of
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      quality_piotroski, quality_altman, market_cap, p_fcf, week52_off_pct, as_of
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const insertVerdict = db.prepare(`
@@ -52,6 +52,9 @@ export function saveTickerResult(db, runId, row, verdicts) {
       row.caution_count,
       row.quality_piotroski,
       row.quality_altman,
+      row.market_cap,
+      row.p_fcf,
+      row.week52_off_pct,
       row.as_of,
     );
     for (const v of verdicts) {
@@ -70,7 +73,7 @@ export function exportLatestRun(db) {
   const rows = db.prepare(`
     SELECT ticker, name, sector, price, composite_score,
            undervalued_count, fair_count, overvalued_count, caution_count,
-           quality_piotroski, quality_altman, as_of
+           quality_piotroski, quality_altman, market_cap, p_fcf, week52_off_pct, as_of
     FROM ticker_results WHERE run_id = ?
     ORDER BY composite_score DESC
   `).all(run.id);
@@ -96,6 +99,10 @@ export function writeLatestRunJson(db) {
   const snapshot = exportLatestRun(db);
   if (!snapshot) return null;
   const outPath = path.join(ROOT, "data", "latest-run.json");
+  const prevPath = path.join(ROOT, "data", "previous-run.json");
+  if (fs.existsSync(outPath)) {
+    fs.copyFileSync(outPath, prevPath);
+  }
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, `${JSON.stringify(snapshot, null, 2)}\n`);
   return outPath;

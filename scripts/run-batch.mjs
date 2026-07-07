@@ -41,6 +41,11 @@ function jitteredDelay() {
   return 2000 + Math.random() * 2000;
 }
 
+function week52OffPct(price, week52High) {
+  if (price == null || week52High == null || week52High <= 0) return null;
+  return ((week52High - price) / week52High) * 100;
+}
+
 async function withRetry(fn, ticker, maxAttempts = 3) {
   let lastErr;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -116,6 +121,9 @@ async function main() {
         caution_count: counts.caution,
         quality_piotroski: data.piotroski ?? null,
         quality_altman: data.altman_z ?? null,
+        market_cap: data.market_cap_value ?? null,
+        p_fcf: data.p_fcf ?? null,
+        week52_off_pct: week52OffPct(data.price, data.week52_high),
         as_of: data.as_of ?? null,
       };
 

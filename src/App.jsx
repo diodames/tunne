@@ -67,16 +67,15 @@ import {
   compositeScoreSummary,
   summarizeGroupVerdicts,
 } from "../lib/scoring.js";
+import { addToWatchlist, loadWatchlist, removeFromWatchlist } from "../lib/watchlist.js";
 
 /* ————— Tausta — undervalued stock screener —————
    Design: Yahoo-style dark theme, Geist / Geist Mono,
    outline-pill verdict tags with soft fills in dense lists. */
 
 const STORAGE_RECENT = "tausta-recent-searches";
-const STORAGE_WATCHLIST = "tausta-watchlist";
 const STORAGE_STRATEGIES = "tausta-strategies";
 const MAX_RECENT_SEARCHES = 3;
-const MAX_WATCHLIST = 20;
 
 const STARTER_PRESETS = [
   {
@@ -214,36 +213,6 @@ function loadSelectedStrategies() {
   return new Set(DEFAULT_STRATEGY_IDS);
 }
 
-function loadWatchlist() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_WATCHLIST) || "[]");
-    if (!Array.isArray(parsed)) return [];
-    return [...new Set(parsed.filter((t) => typeof t === "string" && t.trim()).map((t) => t.toUpperCase()))].slice(0, MAX_WATCHLIST);
-  } catch {
-    return [];
-  }
-}
-
-function saveWatchlist(tickers) {
-  try {
-    localStorage.setItem(STORAGE_WATCHLIST, JSON.stringify(tickers));
-  } catch {
-    // ignore
-  }
-  return tickers;
-}
-
-function addToWatchlist(ticker) {
-  const sym = ticker.toUpperCase();
-  const next = [sym, ...loadWatchlist().filter((t) => t !== sym)].slice(0, MAX_WATCHLIST);
-  return saveWatchlist(next);
-}
-
-function removeFromWatchlist(ticker) {
-  const sym = ticker.toUpperCase();
-  return saveWatchlist(loadWatchlist().filter((t) => t !== sym));
-}
-
 function parseUrlState() {
   const params = new URLSearchParams(window.location.search);
   const tickers = (params.get("t") || "")
@@ -255,7 +224,7 @@ function parseUrlState() {
     .split(/[,;\s]+/)
     .map((t) => t.trim())
     .filter((id) => STRATEGIES.some((s) => s.id === id));
-  return { tickers, strategyIds };
+  return { tickers, strategyIds, from: params.get("from") };
 }
 
 function buildShareUrl(tickers, strategyIds) {
@@ -2860,7 +2829,31 @@ function StarterPanel({ running, onAnalyze, onApplyPersona }) {
   return (
     <>
       <div className="rise mt-8" style={{ animationDelay: "300ms" }}>
-        <SectionLabel className="mb-3">Get started</SectionLabel>
+        <SectionLabel className="mb-3">Screener</SectionLabel>
+        <Link
+          to="/screener"
+          className={cn(
+            "group flex min-w-0 flex-col items-start gap-1 rounded-[12px] bg-card px-3.5 py-2.5",
+            "ring-1 ring-foreground/10 transition-[box-shadow,ring-color] hover:ring-foreground/20",
+            "active:scale-[0.99]",
+          )}
+        >
+          <span className="flex size-7 items-center justify-center overflow-visible rounded-lg bg-muted/50 ring-1 ring-foreground/10 transition-colors group-hover:bg-muted/80">
+            <SearchIcon
+              className="size-3.5 text-muted-foreground transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)] group-hover:scale-110"
+              aria-hidden
+            />
+          </span>
+          <span className="text-sm font-medium">Browse S&amp;P 500 rankings</span>
+          <span className="font-mono text-xs tabular-nums text-muted-foreground">500 tickers · batch run</span>
+          <span className="text-[11px] text-muted-foreground/80">
+            Filter by sector, verdict count, and quality scores — row click opens live analysis
+          </span>
+        </Link>
+      </div>
+
+      <div className="rise mt-6" style={{ animationDelay: "400ms" }}>
+        <SectionLabel className="mb-3">Explore</SectionLabel>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {STARTER_PRESETS.map((preset) => {
@@ -2900,30 +2893,6 @@ function StarterPanel({ running, onAnalyze, onApplyPersona }) {
           })}
         </div>
       </div>
-
-      <div className="rise mt-6" style={{ animationDelay: "400ms" }}>
-        <SectionLabel className="mb-3">Screener</SectionLabel>
-        <Link
-          to="/screener"
-          className={cn(
-            "group flex min-w-0 flex-col items-start gap-1 rounded-[12px] bg-card px-3.5 py-2.5",
-            "ring-1 ring-foreground/10 transition-[box-shadow,ring-color] hover:ring-foreground/20",
-            "active:scale-[0.99]",
-          )}
-        >
-          <span className="flex size-7 items-center justify-center overflow-visible rounded-lg bg-muted/50 ring-1 ring-foreground/10 transition-colors group-hover:bg-muted/80">
-            <SearchIcon
-              className="size-3.5 text-muted-foreground transition-transform duration-200 ease-[cubic-bezier(0.2,0,0,1)] group-hover:scale-110"
-              aria-hidden
-            />
-          </span>
-          <span className="text-sm font-medium">Browse S&amp;P 500 rankings</span>
-          <span className="font-mono text-xs tabular-nums text-muted-foreground">500 tickers · batch run</span>
-          <span className="text-[11px] text-muted-foreground/80">
-            Filter by sector, verdict count, and quality scores — row click opens live analysis
-          </span>
-        </Link>
-      </div>
     </>
   );
 }
@@ -2949,7 +2918,7 @@ function StrategyPicker({ selected, onToggle, onClear, onApplyPersona }) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-72">
         <div className="flex items-center justify-between gap-2 px-2 py-1.5">
-          <DropdownMenuLabel className="mb-0 p-0">Presets</DropdownMenuLabel>
+          <DropdownMenuLabel className="mb-0 p-0">Strategy presets</DropdownMenuLabel>
           <Button
             type="button"
             variant="link"
@@ -3001,6 +2970,9 @@ export default function Tausta() {
   const [watchlist, setWatchlist] = useState(() => loadWatchlist());
   const [activeTicker, setActiveTicker] = useState(null);
   const [toast, setToast] = useState(null);
+  const [fromScreener, setFromScreener] = useState(
+    () => new URLSearchParams(window.location.search).get("from") === "screener",
+  );
   const toastTimeoutRef = useRef(null);
   const urlInit = useRef(false);
 
@@ -3077,7 +3049,8 @@ export default function Tausta() {
   useEffect(() => {
     if (urlInit.current) return;
     urlInit.current = true;
-    const { tickers, strategyIds } = parseUrlState();
+    const { tickers, strategyIds, from } = parseUrlState();
+    if (from === "screener") setFromScreener(true);
     if (strategyIds.length) setSelected(new Set(strategyIds));
     if (tickers.length) {
       analyzeTickers(tickers, strategyIds.length ? new Set(strategyIds) : undefined);
@@ -3141,6 +3114,25 @@ export default function Tausta() {
 
         <div className="border-b border-border pt-6 pb-3 sm:pt-10 sm:pb-4">
           <AppNav subtitle="Ticker background — valuation, range, peers, and street pulse from live data." />
+
+          {fromScreener && (
+            <Alert className="rise mt-4">
+              <InfoIcon />
+              <AlertDescription className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                <span>Live analysis — prices and scores may differ from the batch screener snapshot.</span>
+                <Link to="/screener" className="font-medium text-foreground underline-offset-2 hover:underline">
+                  Back to screener
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setFromScreener(false)}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  Dismiss
+                </button>
+              </AlertDescription>
+            </Alert>
+          )}
 
           {/* controls */}
           <div className="rise mt-4 sm:mt-5" style={{ animationDelay: "100ms" }}>

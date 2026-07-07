@@ -213,6 +213,7 @@ export async function fetchYahooMetrics(ticker) {
     price,
     day_change_pct: num(q.regularMarketChangePercent),
     market_cap: humanizeMarketCap(mcap),
+    market_cap_value: mcap,
     sector: s.assetProfile?.sector || null,
     industry: s.assetProfile?.industry || null,
     eps_ttm: num(q.epsTrailingTwelveMonths),

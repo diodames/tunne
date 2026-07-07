@@ -20,6 +20,9 @@ CREATE TABLE IF NOT EXISTS ticker_results (
   caution_count INTEGER DEFAULT 0,
   quality_piotroski INTEGER,
   quality_altman REAL,
+  market_cap REAL,
+  p_fcf REAL,
+  week52_off_pct REAL,
   as_of TEXT,
   PRIMARY KEY (run_id, ticker)
 );
